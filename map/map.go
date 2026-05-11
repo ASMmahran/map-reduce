@@ -1,3 +1,4 @@
+
 package main
 
 import (
@@ -10,15 +11,22 @@ import (
 
 // Mapper
 func mapper(id int, text string, out chan map[string]int, wg *sync.WaitGroup) {
-
 	defer wg.Done()
 
 	result := make(map[string]int)
 
-	words := strings.Fields(strings.ToLower(text))
+	// Convert to lowercase
+	text = strings.ToLower(text)
 
-	for _, word := range words {
-		result[word]++
+	// Split into characters (A, T, G, C)
+	for _, char := range text {
+
+		// Ignore spaces/newlines
+		if char == ' ' || char == '\n' || char == '\r' {
+			continue
+		}
+
+		result[string(char)]++
 	}
 
 	fmt.Println("Mapper", id, "finished")
@@ -27,12 +35,15 @@ func mapper(id int, text string, out chan map[string]int, wg *sync.WaitGroup) {
 }
 
 // Reducer
-func reducer(in chan map[string]int, finalResult map[string]int, done chan bool) {
+func reducer(
+	in chan map[string]int,
+	finalResult map[string]int,
+	done chan bool,
+) {
 
 	for partial := range in {
 
 		for word, count := range partial {
-
 			finalResult[word] += count
 		}
 	}
@@ -42,7 +53,7 @@ func reducer(in chan map[string]int, finalResult map[string]int, done chan bool)
 
 func main() {
 
-	filePath := "D:\\university\\fourth\\2nd\\DDB\\Section\\Practice-DDB-main\\Section 5\\Scripts\\Data\\genome.fa"
+	filePath := `D:\university\fourth\2nd\DDB\Section\Practice-DDB-main\Section 5\Scripts\Data\genome.fa`
 
 	file, err := os.Open(filePath)
 
@@ -55,6 +66,10 @@ func main() {
 
 	scanner := bufio.NewScanner(file)
 
+	// Increase scanner buffer size
+	buf := make([]byte, 1024)
+	scanner.Buffer(buf, 1024*1024)
+
 	mapperChannel := make(chan map[string]int)
 
 	done := make(chan bool)
@@ -66,12 +81,17 @@ func main() {
 	// Start reducer
 	go reducer(mapperChannel, finalResult, done)
 
-	mapperID := 10
+	mapperID := 1
 
 	// Read file line by line
 	for scanner.Scan() {
 
 		line := scanner.Text()
+
+		// Skip FASTA headers
+		if strings.HasPrefix(line, ">") {
+			continue
+		}
 
 		wg.Add(1)
 
@@ -80,24 +100,36 @@ func main() {
 		mapperID++
 	}
 
+	// Check scanner error
+	if err := scanner.Err(); err != nil {
+		fmt.Println("Scanner error:", err)
+		return
+	}
+
 	// Wait all mappers
 	wg.Wait()
 
-	// Close mapper channel
+	// Close channel
 	close(mapperChannel)
 
 	// Wait reducer
 	<-done
 
-	// Total words
-	totalWords := 0
+	// Calculate total characters
+	total := 0
 
 	for _, count := range finalResult {
-		totalWords += count
+		total += count
 	}
 
 	fmt.Println("\n========================")
-	fmt.Println("Total Words:", totalWords)
+	fmt.Println("Total Characters:", total)
 	fmt.Println("========================")
 
+	// Print result
+	fmt.Println("\nGenome Character Count:")
+
+	for word, count := range finalResult {
+		fmt.Printf("%s : %d\n", word, count)
+	}
 }
