@@ -1,135 +1,96 @@
-
 package main
 
 import (
-	"bufio"
+	"encoding/json"
 	"fmt"
-	"os"
-	"strings"
+	"net/http"
 	"sync"
 )
 
-// Mapper
-func mapper(id int, text string, out chan map[string]int, wg *sync.WaitGroup) {
-	defer wg.Done()
-
-	result := make(map[string]int)
-
-	// Convert to lowercase
-	text = strings.ToLower(text)
-
-	// Split into characters (A, T, G, C)
-	for _, char := range text {
-
-		// Ignore spaces/newlines
-		if char == ' ' || char == '\n' || char == '\r' {
-			continue
-		}
-
-		result[string(char)]++
-	}
-
-	fmt.Println("Mapper", id, "finished")
-
-	out <- result
+type Result struct {
+	Counts map[string]int `json:"counts"`
 }
 
-// Reducer
-func reducer(
-	in chan map[string]int,
-	finalResult map[string]int,
-	done chan bool,
-) {
+type WorkerResponse struct {
+	Data map[string]int
+	Err  error
+}
 
-	for partial := range in {
+func requestWorker(url string, ch chan WorkerResponse, wg *sync.WaitGroup) {
 
-		for word, count := range partial {
-			finalResult[word] += count
-		}
+	defer wg.Done()
+
+	resp, err := http.Get(url)
+
+	if err != nil {
+		ch <- WorkerResponse{Err: err}
+		return
 	}
 
-	done <- true
+	defer resp.Body.Close()
+
+	var result Result
+
+	err = json.NewDecoder(resp.Body).Decode(&result)
+
+	if err != nil {
+		ch <- WorkerResponse{Err: err}
+		return
+	}
+
+	ch <- WorkerResponse{
+		Data: result.Counts,
+	}
 }
 
 func main() {
 
-	filePath := `D:\university\fourth\2nd\DDB\Section\Practice-DDB-main\Section 5\Scripts\Data\genome.fa`
-
-	file, err := os.Open(filePath)
-
-	if err != nil {
-		fmt.Println("Error opening file:", err)
-		return
+	workers := []string{
+		"http://192.168.1.10:8081/count",
+		"http://192.168.1.11:8082/count",
+		"http://192.168.1.12:8083/count",
 	}
-
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-
-	// Increase scanner buffer size
-	buf := make([]byte, 1024)
-	scanner.Buffer(buf, 1024*1024)
-
-	mapperChannel := make(chan map[string]int)
-
-	done := make(chan bool)
 
 	finalResult := make(map[string]int)
 
+	ch := make(chan WorkerResponse)
+
 	var wg sync.WaitGroup
 
-	// Start reducer
-	go reducer(mapperChannel, finalResult, done)
-
-	mapperID := 1
-
-	// Read file line by line
-	for scanner.Scan() {
-
-		line := scanner.Text()
-
-		// Skip FASTA headers
-		if strings.HasPrefix(line, ">") {
-			continue
-		}
+	for _, worker := range workers {
 
 		wg.Add(1)
 
-		go mapper(mapperID, line, mapperChannel, &wg)
-
-		mapperID++
+		go requestWorker(worker, ch, &wg)
 	}
 
-	// Check scanner error
-	if err := scanner.Err(); err != nil {
-		fmt.Println("Scanner error:", err)
-		return
+	go func() {
+		wg.Wait()
+		close(ch)
+	}()
+
+	for response := range ch {
+
+		if response.Err != nil {
+			fmt.Println("Worker Error:", response.Err)
+			continue
+		}
+
+		for char, count := range response.Data {
+			finalResult[char] += count
+		}
 	}
 
-	// Wait all mappers
-	wg.Wait()
-
-	// Close channel
-	close(mapperChannel)
-
-	// Wait reducer
-	<-done
-
-	// Calculate total characters
 	total := 0
 
-	for _, count := range finalResult {
+	fmt.Println("\nFinal Result:")
+
+	for char, count := range finalResult {
+
+		fmt.Printf("%s : %d\n", char, count)
+
 		total += count
 	}
 
-	fmt.Println("\n========================")
-	fmt.Println("Total Characters:", total)
-	fmt.Println("========================")
-
-	// Print result
-	fmt.Println("\nGenome Character Count:")
-
-	for word, count := range finalResult {
-		fmt.Printf("%s : %d\n", word, count)
-	}
+	fmt.Println("\nTotal:", total)
 }
