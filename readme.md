@@ -1,22 +1,96 @@
-````md id="kw8x2v"
-# Distributed File Transfer & MapReduce using Go
+````markdown
+# Distributed MapReduce System using Go
 
 ## Overview
 
-This project demonstrates a simple Distributed System using Go.
+This project demonstrates a simple Distributed MapReduce System using Go.
 
 The system contains:
 
-- File Sender
-- File Receiver
-- MapReduce Word Count
+- Master Node
+- Worker Nodes
+- Distributed Processing
+- HTTP Communication
+- Concurrent Requests
+- MapReduce Character Counting
 
 The project uses:
+
 - Goroutines
 - Channels
-- HTTP
-- Multipart Upload
+- HTTP APIs
+- JSON Communication
 - Concurrent Processing
+- Distributed Computing Concepts
+
+---
+
+# Project Architecture
+
+```text
+                    MASTER NODE
+                          |
+        ---------------------------------------
+        |                 |                   |
+        |                 |                   |
+     Worker-1          Worker-2           Worker-3
+    genome1.fa        genome2.fa         genome3.fa
+````
+
+---
+
+# How The System Works
+
+1. The Master Node sends HTTP requests to all Workers.
+2. Each Worker processes its local genome file.
+3. Workers count genome characters:
+
+   * A
+   * T
+   * G
+   * C
+4. Each Worker sends its partial result back to the Master.
+5. The Master combines all results.
+6. Final result is displayed.
+
+---
+
+# MapReduce Flow
+
+```text
+Distributed Files
+       |
+       v
++-------------------+
+|   Worker Nodes    |
+| Local Processing  |
++-------------------+
+       |
+       v
+Partial Results
+       |
+       v
++-------------------+
+|    MASTER NODE    |
+|   Reduce Phase    |
++-------------------+
+       |
+       v
+ Final Combined Result
+```
+
+---
+
+# Technologies Used
+
+* Golang
+* Goroutines
+* Channels
+* HTTP Server
+* HTTP Client
+* JSON
+* Concurrent Programming
+* Distributed Systems
 
 ---
 
@@ -25,336 +99,168 @@ The project uses:
 ```text
 project/
 │
-├── sender.go
-├── receiver.go
-├── mapreduce.go
-├── uploads/
+├── master/
+│   └── main.go
+│
+├── worker/
+│   └── main.go
+│
+├── data/
+│   ├── genome1.fa
+│   ├── genome2.fa
+│   └── genome3.fa
+│
 └── README.md
-````
-
----
-
-# Sender
-
-## Purpose
-
-The sender sends files from one computer to another using HTTP POST requests.
-
----
-
-## Features
-
-* Send multiple files
-* Concurrent file reading
-* Multipart upload
-* Uses Channels and Goroutines
-
----
-
-## Important Code
-
-### Goroutine
-
-```go id="jlwm6s"
-go readFile(filePath, ch)
-```
-
-Used for concurrent execution.
-
----
-
-### Channel
-
-```go id="jlwm7g"
-ch := make(chan []byte)
-```
-
-Transfers file data between Goroutines.
-
----
-
-### Multipart Upload
-
-```go id="4fjlwm"
-writer.CreateFormFile("Files", fileName)
-```
-
-Creates upload form data.
-
----
-
-# Sender Flow
-
-```text
-Read File
-   ↓
-Goroutine
-   ↓
-Channel
-   ↓
-HTTP POST
-   ↓
-Receiver
 ```
 
 ---
 
-# Receiver
+# Worker Responsibilities
 
-## Purpose
+Each Worker:
 
-Receives uploaded files and saves them in:
-
-```text
-uploads/
-```
-
----
-
-## Endpoint
-
-```text
-/save
-```
-
----
-
-## Receiver Flow
-
-```text
-HTTP Request
-     ↓
-Parse Multipart Form
-     ↓
-Extract Files
-     ↓
-Save Files
-```
-
----
-
-# MapReduce
-
-## Purpose
-
-Processes:
-
-```text
-gene.fna
-```
-
-The system calculates:
-
-* Total words
-* Words repeated more than 10 times
-
----
-
-# MapReduce Architecture
-
-```text
-Input File
-    ↓
-Scanner
-    ↓
-Lines
-    ↓
-Mapper Goroutines
-    ↓
-Channel
-    ↓
-Reducer
-    ↓
-Final Result
-```
-
----
-
-# Mapper
-
-The mapper:
-
-* Reads line
-* Splits words
-* Counts occurrences
+* Stores a part of the dataset
+* Runs local processing
+* Counts genome characters
+* Sends results to Master
 
 Example:
 
 ```text
-go go map
+Worker-1 -> genome1.fa
+Worker-2 -> genome2.fa
+Worker-3 -> genome3.fa
 ```
 
-Result:
+---
+
+# Master Responsibilities
+
+The Master Node:
+
+* Sends requests to Workers
+* Receives all partial results
+* Combines final counts
+* Displays final output
+
+---
+
+# Example Final Output
 
 ```text
-go : 2
-map : 1
+=================================
+ FINAL RESULT
+=================================
+
+a : 120000
+t : 118000
+g : 115000
+c : 121000
+
+Total : 474000
+
+MASTER FINISHED SUCCESSFULLY
 ```
 
 ---
 
-# Reducer
+# Features
 
-The reducer:
-
-* Receives mapper results
-* Merges counts
-* Produces final output
+* Distributed Processing
+* Parallel Execution
+* HTTP Communication
+* Concurrent Workers
+* Real-Time Logging
+* JSON Data Exchange
+* MapReduce Simulation
+* Scalable Architecture
 
 ---
 
-# Concurrency
+# Running The Project
 
-## Goroutines
+## 1. Start Workers
 
-```go id="jlwm4p"
-go mapper(...)
+Run on each Worker machine:
+
+```bash
+go run main.go
 ```
 
-Used for parallel processing.
-
 ---
 
-## WaitGroup
+## 2. Configure Worker IPs
 
-```go id="jlwm7t"
-var wg sync.WaitGroup
+Example:
+
+```go
+workers := []string{
+    "http://192.168.1.10:8081/count",
+    "http://192.168.1.11:8082/count",
+    "http://192.168.1.12:8083/count",
+}
 ```
 
-Waits for all mappers.
-
 ---
 
-## Channels
+## 3. Run Master
 
-Used for safe communication between Goroutines.
-
----
-
-# Running Receiver
-
-```bash id="jlwm8k"
-go run receiver.go
+```bash
+go run main.go
 ```
 
-Receiver listens on:
+---
+
+# Example Worker Log
 
 ```text
-:9080
+[WORKER] Request Received From Master
+[WORKER] Starting Genome Processing...
+[WORKER] Finished Processing
+[WORKER] Result Sent Successfully
 ```
 
 ---
 
-# Running Sender
-
-Update receiver IP:
-
-```go id="jlwm4g"
-http://192.168.8.8:9080/save
-```
-
-Then run:
-
-```bash id="jlwm6z"
-go run sender.go
-```
-
----
-
-# Running MapReduce
-
-```bash id="jlwm1x"
-go run mapreduce.go
-```
-
----
-
-# Network Requirements
-
-Both devices must:
-
-* Be on same Wi-Fi/LAN
-* Allow port 9080 through firewall
-
----
-
-# Example IPs
-
-Sender PC:
+# Example Master Log
 
 ```text
-192.168.8.15
-```
-
-Receiver PC:
-
-```text
-192.168.8.8
+Connecting To: http://192.168.1.10:8081/count
+Data Received From: http://192.168.1.10:8081/count
+Result Received From Worker
 ```
 
 ---
 
-# Example Output
-
-## Receiver
-
-```text
-Request received
-Saved: gene.fna
-```
-
----
-
-## MapReduce
-
-```text
-Total Words: 50000
-
-Words Count > 10:
-
-gene : 120
-dna : 55
-sequence : 42
-```
-
----
-
-# Concepts Learned
-
-This project demonstrates:
+# Concepts Demonstrated
 
 * Distributed Systems
-* File Transfer
-* HTTP Communication
-* Goroutines
-* Channels
-* Parallel Processing
-* Synchronization
 * MapReduce
+* Parallel Computing
+* Network Communication
+* Client-Server Architecture
+* Concurrent Programming
+* Data Aggregation
 
 ---
 
 # Future Improvements
 
-* Encryption
-* Compression
-* Multiple Nodes
 * Fault Tolerance
-* Distributed Storage
-* Hadoop-style Distribution
+* Dynamic Worker Discovery
+* Heartbeat Monitoring
+* Load Balancing
+* Distributed File Storage
+* Web Dashboard
+* Docker Deployment
 
 ---
 
 # Conclusion
 
-This project combines:
+This project demonstrates a simplified Distributed MapReduce System inspired by large-scale distributed processing systems such as Google MapReduce and Hadoop.
 
-* Networking
-* Concurrency
-* Distributed Processing
-* MapReduce
-
-using Go.
+The system distributes computation across multiple Worker Nodes and combines results using a central Master Node.
 
 ```
 ```
