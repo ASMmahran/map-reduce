@@ -20,12 +20,18 @@ func requestWorker(url string, ch chan WorkerResponse, wg *sync.WaitGroup) {
 
 	defer wg.Done()
 
+	fmt.Println("Connecting To:", url)
+
 	resp, err := http.Get(url)
 
 	if err != nil {
+
 		ch <- WorkerResponse{Err: err}
+
 		return
 	}
+
+	fmt.Println("Connected Successfully:", url)
 
 	defer resp.Body.Close()
 
@@ -34,21 +40,34 @@ func requestWorker(url string, ch chan WorkerResponse, wg *sync.WaitGroup) {
 	err = json.NewDecoder(resp.Body).Decode(&result)
 
 	if err != nil {
+
 		ch <- WorkerResponse{Err: err}
+
 		return
 	}
+
+	fmt.Println("Data Received From:", url)
 
 	ch <- WorkerResponse{
 		Data: result.Counts,
 	}
 }
-
 func main() {
 
+	fmt.Println("=================================")
+	fmt.Println(" Distributed MapReduce MASTER ")
+	fmt.Println("=================================")
+
 	workers := []string{
-		"http://192.168.1.10:8081/count",
-		"http://192.168.1.11:8082/count",
-		"http://192.168.1.12:8083/count",
+		"http://192.168.8.8:8081/count",
+		"http://localhost:8082/count",
+		"http://localhost:8083/count",
+	}
+
+	fmt.Println("\nWorkers Registered:")
+
+	for _, worker := range workers {
+		fmt.Println("->", worker)
 	}
 
 	finalResult := make(map[string]int)
@@ -56,6 +75,8 @@ func main() {
 	ch := make(chan WorkerResponse)
 
 	var wg sync.WaitGroup
+
+	fmt.Println("\nSending Requests To Workers...")
 
 	for _, worker := range workers {
 
@@ -72,9 +93,13 @@ func main() {
 	for response := range ch {
 
 		if response.Err != nil {
-			fmt.Println("Worker Error:", response.Err)
+
+			fmt.Println("Worker Failed:", response.Err)
+
 			continue
 		}
+
+		fmt.Println("Result Received From Worker")
 
 		for char, count := range response.Data {
 			finalResult[char] += count
@@ -83,7 +108,9 @@ func main() {
 
 	total := 0
 
-	fmt.Println("\nFinal Result:")
+	fmt.Println("\n=================================")
+	fmt.Println(" FINAL RESULT ")
+	fmt.Println("=================================")
 
 	for char, count := range finalResult {
 
@@ -93,4 +120,6 @@ func main() {
 	}
 
 	fmt.Println("\nTotal:", total)
+
+	fmt.Println("\nMASTER FINISHED SUCCESSFULLY")
 }
